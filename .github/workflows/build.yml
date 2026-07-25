@@ -1,0 +1,53 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download ffmpeg for Windows
+        run: |
+          curl -L "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -o ffmpeg.zip
+          Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg_extracted
+          Get-ChildItem -Recurse -Filter "ffmpeg.exe"  ffmpeg_extracted | Copy-Item -Destination "."
+          Get-ChildItem -Recurse -Filter "ffprobe.exe" ffmpeg_extracted | Copy-Item -Destination "."
+
+      - name: Build EXE with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed --name "VideoDownloader" `
+            --add-binary "ffmpeg.exe;." `
+            --add-binary "ffprobe.exe;." `
+            downloader.py
+
+      - name: Upload EXE as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VideoDownloader-Windows
+          path: dist/VideoDownloader.exe
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: "latest"
+          name: "Latest Build"
+          files: dist/VideoDownloader.exe
+          body: "Automatic build - ffmpeg bundled inside"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
