@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# ✅ এই permissions block টাই আসল সমাধান
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -49,5 +53,5 @@ jobs:
           name: "Latest Build"
           files: dist/VideoDownloader.exe
           body: "Automatic build - ffmpeg bundled inside"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # ✅ token এখানেও explicitly দিতে হবে
+          token: ${{ secrets.GITHUB_TOKEN }}
