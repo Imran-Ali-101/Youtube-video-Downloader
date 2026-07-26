@@ -38,6 +38,8 @@ jobs:
           pyinstaller --onefile --windowed --name "VideoDownloader" `
             --add-binary "ffmpeg.exe;." `
             --add-binary "ffprobe.exe;." `
+            --add-data "logo.ico;." `
+            --add-data "logo.png;." `
             --icon "logo.ico" `
             downloader.py
 
