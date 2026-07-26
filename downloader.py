@@ -67,8 +67,8 @@ class ProDownloader:
         # Window size: screen width x (screen height - 50px)
         sw = root.winfo_screenwidth()
         sh = root.winfo_screenheight()
-        win_w = max(sw, MIN_W)
-        win_h = sh - 50
+        win_w = MIN_W
+        win_h = sh - 75
 
         # Center the window on screen
         x = (sw - win_w) // 2
