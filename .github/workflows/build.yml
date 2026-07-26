@@ -38,6 +38,7 @@ jobs:
           pyinstaller --onefile --windowed --name "VideoDownloader" `
             --add-binary "ffmpeg.exe;." `
             --add-binary "ffprobe.exe;." `
+            --icon "logo.ico" `
             downloader.py
 
       - name: Upload EXE as artifact
