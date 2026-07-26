@@ -68,7 +68,7 @@ class ProDownloader:
         sw = root.winfo_screenwidth()
         sh = root.winfo_screenheight()
         win_w = MIN_W
-        win_h = sh - 75
+        win_h = sh - 120
 
         # Center the window on screen
         x = (sw - win_w) // 2
@@ -401,11 +401,11 @@ class ProDownloader:
                 self.total_label.config(text="Paused", fg=WARNING)
                 self.status_dot.config(fg=WARNING)
             else:
-                self.total_label.config(text=f"Downloading  {current} / {total_v}", fg=TEXT_PRI)
+                self.total_label.config(text=f"Downloading... {current} / {total_v}", fg=TEXT_PRI)
                 self.status_dot.config(fg=ACCENT)
 
             self.file_label.config(text=f"↓  {fname}" if fname else "")
-            self.stats_label.config(text=f"{speed.strip()}  ·  ETA {eta.strip()}")
+            self.stats_label.config(text=f"{speed.strip()}  ·  ETA {eta.strip()}  ·  {done_mb:.1f} / {total_mb:.1f} MB")
             self.root.update_idletasks()
 
         elif d['status'] == 'finished':
