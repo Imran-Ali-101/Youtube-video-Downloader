@@ -56,7 +56,7 @@ TEXT_PRI = "#111827"
 TEXT_SEC = "#6b7280"
 BORDER   = "#d1d5db"
 
-MIN_W    = 500   # minimum window width
+MIN_W    = 500
 
 
 class ProDownloader:
@@ -64,13 +64,10 @@ class ProDownloader:
         self.root = root
         self.root.title("StreamGet — Video Downloader")
 
-        # Window size: screen width x (screen height - 50px)
         sw = root.winfo_screenwidth()
         sh = root.winfo_screenheight()
         win_w = MIN_W
         win_h = sh - 120
-
-        # Center the window on screen
         x = (sw - win_w) // 2
         self.root.geometry(f"{win_w}x{win_h}+{x}+0")
         self.root.configure(bg=BG)
@@ -118,14 +115,10 @@ class ProDownloader:
 
         link_row = tk.Frame(left_col, bg=SURFACE)
         link_row.pack(anchor='w', pady=(6, 0))
-
-        # GitHub button
         self._footer_link(link_row, "  GitHub  ",
                           "https://github.com/Imran-Ali-101/", "#24292e").pack(side=tk.LEFT, padx=(0, 6))
-        # LinkedIn button
         self._footer_link(link_row, "  LinkedIn  ",
                           "https://www.linkedin.com/in/imran-ali101/", "#0a66c2").pack(side=tk.LEFT, padx=(0, 6))
-        # Email button
         self._footer_link(link_row, "  Email  ",
                           "mailto:imran.28279@gmail.com", "#ea4335").pack(side=tk.LEFT)
 
@@ -151,7 +144,6 @@ class ProDownloader:
         self.canvas.bind("<Configure>", self._on_canvas_resize)
         self.inner.bind("<Configure>",  self._on_inner_resize)
 
-        # Mouse wheel scroll (cross-platform)
         self.canvas.bind_all("<MouseWheel>",
                              lambda e: self.canvas.yview_scroll(-1 * (e.delta // 120), "units"))
         self.canvas.bind_all("<Button-4>",
@@ -194,7 +186,6 @@ class ProDownloader:
                                   highlightthickness=1, pady=14, padx=16)
         settings_outer.pack(fill=tk.X, pady=(6, 16))
 
-        # Quality column
         col1 = tk.Frame(settings_outer, bg=SURFACE)
         col1.pack(side=tk.LEFT, expand=True)
         tk.Label(col1, text="QUALITY", font=('Arial', 8, 'bold'),
@@ -214,7 +205,6 @@ class ProDownloader:
 
         tk.Frame(settings_outer, bg=BORDER, width=1).pack(side=tk.LEFT, fill=tk.Y, padx=20)
 
-        # Playlist range column
         col2 = tk.Frame(settings_outer, bg=SURFACE)
         col2.pack(side=tk.LEFT, expand=True)
         tk.Label(col2, text="PLAYLIST RANGE", font=('Arial', 8, 'bold'),
@@ -246,8 +236,8 @@ class ProDownloader:
                                lambda e: self.folder_label.config(wraplength=max(60, e.width - 10)))
         btn_frame = tk.Frame(folder_card, bg=SURFACE)
         btn_frame.pack(side=tk.RIGHT)
-        self._small_btn(btn_frame, "Browse",  self.browse,       SURFACE2).pack(side=tk.LEFT, padx=4)
-        self._small_btn(btn_frame, "Open ↗",  self.open_folder,  SURFACE2).pack(side=tk.LEFT)
+        self._small_btn(btn_frame, "Browse",  self.browse,      SURFACE2).pack(side=tk.LEFT, padx=4)
+        self._small_btn(btn_frame, "Open ↗",  self.open_folder, SURFACE2).pack(side=tk.LEFT)
 
         # ── STATUS ──────────────────────────────────────────
         status_card = tk.Frame(wrap, bg=SURFACE, highlightbackground=BORDER,
@@ -341,7 +331,6 @@ class ProDownloader:
                          command=cmd)
 
     def _footer_link(self, parent, text, url, color):
-        """Colored pill button that opens a URL in the browser."""
         btn = tk.Label(parent, text=text, font=('Arial', 8, 'bold'),
                        fg="white", bg=color, cursor="hand2", padx=6, pady=4)
         btn.bind("<Button-1>", lambda e: webbrowser.open(url))
@@ -385,10 +374,17 @@ class ProDownloader:
         if d['status'] == 'downloading':
             total_b    = d.get('total_bytes') or d.get('total_bytes_estimate')
             downloaded = d.get('downloaded_bytes', 0)
+
+            # Calculate MB values for display
             if total_b:
-                p_val = (downloaded / total_b) * 100
+                p_val    = (downloaded / total_b) * 100
+                total_mb = total_b / 1024 / 1024
+                done_mb  = downloaded / 1024 / 1024
                 self.progress_bar['value'] = p_val
                 self.percent_label.config(text=f"{p_val:.0f}%")
+            else:
+                total_mb = 0
+                done_mb  = downloaded / 1024 / 1024
 
             info    = d.get('info_dict', {})
             current = info.get('playlist_index') or d.get('playlist_index', 1)
@@ -401,11 +397,13 @@ class ProDownloader:
                 self.total_label.config(text="Paused", fg=WARNING)
                 self.status_dot.config(fg=WARNING)
             else:
-                self.total_label.config(text=f"Downloading... {current} / {total_v}", fg=TEXT_PRI)
+                self.total_label.config(text=f"Downloading...  {current} / {total_v}", fg=TEXT_PRI)
                 self.status_dot.config(fg=ACCENT)
 
             self.file_label.config(text=f"↓  {fname}" if fname else "")
-            self.stats_label.config(text=f"{speed.strip()}  ·  ETA {eta.strip()}  ·  {done_mb:.1f} / {total_mb:.1f} MB")
+            self.stats_label.config(
+                text=f"{speed.strip()}  ·  ETA {eta.strip()}  ·  {done_mb:.1f} / {total_mb:.1f} MB  ·  Item {current} / {total_v}"
+            )
             self.root.update_idletasks()
 
         elif d['status'] == 'finished':
