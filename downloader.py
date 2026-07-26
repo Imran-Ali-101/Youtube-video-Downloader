@@ -56,20 +56,21 @@ TEXT_PRI = "#111827"
 TEXT_SEC = "#6b7280"
 BORDER   = "#d1d5db"
 
-MIN_W    = 500
+MIN_W    = 550
 
 
 class ProDownloader:
     def __init__(self, root):
         self.root = root
         self.root.title("StreamGet —Video Downloader")
-        # Set window icon
         try:
             if getattr(sys, 'frozen', False):
-                icon_path = os.path.join(sys._MEIPASS, "logo.ico")
+                base = sys._MEIPASS
             else:
-                icon_path = os.path.join(os.path.dirname(__file__), "logo.ico")
-            self.root.iconbitmap(icon_path)
+                base = os.path.dirname(os.path.abspath(__file__))
+            self.root.iconbitmap(os.path.join(base, "logo.ico"))
+            img = tk.PhotoImage(file=os.path.join(base, "logo.png"))
+            self.root.iconphoto(True, img)
         except:
             pass
 
