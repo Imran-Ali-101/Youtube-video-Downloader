@@ -62,7 +62,16 @@ MIN_W    = 500
 class ProDownloader:
     def __init__(self, root):
         self.root = root
-        self.root.title("StreamGet — Video Downloader")
+        self.root.title("StreamGet —Video Downloader")
+        # Set window icon
+        try:
+            if getattr(sys, 'frozen', False):
+                icon_path = os.path.join(sys._MEIPASS, "logo.ico")
+            else:
+                icon_path = os.path.join(os.path.dirname(__file__), "logo.ico")
+            self.root.iconbitmap(icon_path)
+        except:
+            pass
 
         sw = root.winfo_screenwidth()
         sh = root.winfo_screenheight()
