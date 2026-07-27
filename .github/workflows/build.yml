@@ -9,9 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Download ffmpeg (only extract ffmpeg.exe and ffprobe.exe)
+      - name: Download ffmpeg
         run: |
           curl -L "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -o ffmpeg.zip
           Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg_extracted
@@ -57,4 +56,73 @@ jobs:
           name: "Latest Build"
           files: dist/VideoDownloader.exe
           body: "Single .exe"
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+          sudo apt-get install -y ffmpeg
+
+      - name: Build Linux binary
+        run: |
+          pyinstaller --onefile --windowed --name "VideoDownloader" \
+            --add-data "logo.ico:." \
+            --add-data "logo.png:." \
+            downloader.py
+
+      - name: Create .deb package
+        run: |
+          mkdir -p deb_pkg/usr/local/bin
+          mkdir -p deb_pkg/usr/share/applications
+          mkdir -p deb_pkg/DEBIAN
+
+          cp dist/VideoDownloader deb_pkg/usr/local/bin/
+          chmod +x deb_pkg/usr/local/bin/VideoDownloader
+
+          cat > deb_pkg/usr/share/applications/streamget.desktop << 'EOF'
+          [Desktop Entry]
+          Name=StreamGet
+          Comment=Video Downloader
+          Exec=/usr/local/bin/VideoDownloader
+          Icon=/usr/local/bin/logo.png
+          Terminal=false
+          Type=Application
+          Categories=Network;
+          EOF
+
+          cat > deb_pkg/DEBIAN/control << 'EOF'
+          Package: streamget
+          Version: 2.0
+          Architecture: amd64
+          Maintainer: Md. Imran Ali <imran.28279@gmail.com>
+          Description: StreamGet Video Downloader
+          EOF
+
+          dpkg-deb --build deb_pkg StreamGet_Linux.deb
+
+      - name: Upload .deb as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StreamGet-Linux
+          path: StreamGet_Linux.deb
+
+      - name: Add .deb to Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: "latest"
+          name: "Latest Build"
+          files: StreamGet_Linux.deb
           token: ${{ secrets.GITHUB_TOKEN }}
