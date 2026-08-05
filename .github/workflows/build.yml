@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build Windows EXE & Linux DEB
 
 on:
   push:
@@ -9,6 +9,8 @@ permissions:
   contents: write
 
 jobs:
+
+  #  WINDOWS — EXE + NSIS Installer (Start Menu & Desktop shortcut)
   build-windows:
     runs-on: windows-latest
     steps:
@@ -20,7 +22,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: pip install -r requirements.txt
 
       - name: Download ffmpeg
@@ -42,22 +44,110 @@ jobs:
             --icon "logo.ico" `
             downloader.py
 
-      - name: Upload EXE as artifact
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Create NSIS installer script
+        run: |
+          @"
+          !include "MUI2.nsh"
+
+          Name "StreamGet"
+          OutFile "StreamGet_Setup.exe"
+          InstallDir "`$PROGRAMFILES\StreamGet"
+          InstallDirRegKey HKCU "Software\StreamGet" ""
+          RequestExecutionLevel admin
+          Unicode True
+
+          !insertmacro MUI_PAGE_WELCOME
+          !insertmacro MUI_PAGE_DIRECTORY
+          !insertmacro MUI_PAGE_INSTFILES
+          !insertmacro MUI_PAGE_FINISH
+
+          !insertmacro MUI_UNPAGE_CONFIRM
+          !insertmacro MUI_UNPAGE_INSTFILES
+
+          !insertmacro MUI_LANGUAGE "English"
+
+          Section "StreamGet" SecMain
+            SetOutPath "`$INSTDIR"
+            File "dist\VideoDownloader.exe"
+            File "logo.ico"
+
+            ; Start Menu shortcut
+            CreateDirectory "`$SMPROGRAMS\StreamGet"
+            CreateShortcut "`$SMPROGRAMS\StreamGet\StreamGet.lnk" "`$INSTDIR\VideoDownloader.exe" "" "`$INSTDIR\logo.ico"
+            CreateShortcut "`$SMPROGRAMS\StreamGet\Uninstall.lnk" "`$INSTDIR\Uninstall.exe"
+
+            ; Desktop shortcut
+            CreateShortcut "`$DESKTOP\StreamGet.lnk" "`$INSTDIR\VideoDownloader.exe" "" "`$INSTDIR\logo.ico"
+
+            ; Registry for uninstaller (Add/Remove Programs)
+            WriteRegStr HKCU "Software\StreamGet" "" "`$INSTDIR"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\StreamGet" "DisplayName" "StreamGet Video Downloader"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\StreamGet" "UninstallString" "`$INSTDIR\Uninstall.exe"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\StreamGet" "DisplayIcon" "`$INSTDIR\logo.ico"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\StreamGet" "Publisher" "Md. Imran Ali"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\StreamGet" "DisplayVersion" "2.0"
+
+            WriteUninstaller "`$INSTDIR\Uninstall.exe"
+          SectionEnd
+
+          Section "Uninstall"
+            Delete "`$INSTDIR\VideoDownloader.exe"
+            Delete "`$INSTDIR\logo.ico"
+            Delete "`$INSTDIR\Uninstall.exe"
+            RMDir  "`$INSTDIR"
+
+            Delete "`$SMPROGRAMS\StreamGet\StreamGet.lnk"
+            Delete "`$SMPROGRAMS\StreamGet\Uninstall.lnk"
+            RMDir  "`$SMPROGRAMS\StreamGet"
+
+            Delete "`$DESKTOP\StreamGet.lnk"
+
+            DeleteRegKey HKCU "Software\StreamGet"
+            DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\StreamGet"
+          SectionEnd
+          "@ | Out-File -Encoding ASCII installer.nsi
+
+      - name: Build NSIS installer
+        run: makensis installer.nsi
+
+      - name: Upload portable EXE as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VideoDownloader-Windows
+          name: VideoDownloader-Windows-Portable
           path: dist/VideoDownloader.exe
 
-      - name: Create Release
+      - name: Upload installer as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StreamGet-Windows-Setup
+          path: StreamGet_Setup.exe
+
+      - name: Create / update Release
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
           tag_name: "latest"
           name: "Latest Build"
-          files: dist/VideoDownloader.exe
-          body: "Single .exe"
+          files: |
+            dist/VideoDownloader.exe
+            StreamGet_Setup.exe
+          body: |
+            ## StreamGet v2.0
+
+            ### Windows
+            - **StreamGet_Setup.exe** — Installer (Start Menu + Desktop shortcut)
+            - **VideoDownloader.exe** — Portable (no install needed)
+
+            ### Linux
+            - **StreamGet_Linux.deb** — Debian/Ubuntu package
           token: ${{ secrets.GITHUB_TOKEN }}
 
+
+
+  #  LINUX — Binary + .deb package (App Menu shortcut)
   build-linux:
     runs-on: ubuntu-latest
     steps:
@@ -69,16 +159,19 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg python3-tk
+
+      - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
           pip install pyinstaller
-          sudo apt-get install -y ffmpeg
 
       - name: Build Linux binary
         run: |
-          pyinstaller --onefile --windowed --name "VideoDownloader" \
-            --add-data "logo.ico:." \
+          pyinstaller --onefile --noconsole --name "VideoDownloader" \
             --add-data "logo.png:." \
             downloader.py
 
@@ -86,29 +179,68 @@ jobs:
         run: |
           mkdir -p deb_pkg/usr/local/bin
           mkdir -p deb_pkg/usr/share/applications
+          mkdir -p deb_pkg/usr/share/icons/hicolor/256x256/apps
           mkdir -p deb_pkg/DEBIAN
 
-          cp dist/VideoDownloader deb_pkg/usr/local/bin/
+          # Binary
+          cp dist/VideoDownloader deb_pkg/usr/local/bin/VideoDownloader
           chmod +x deb_pkg/usr/local/bin/VideoDownloader
 
+          # Icon
+          cp logo.png deb_pkg/usr/share/icons/hicolor/256x256/apps/streamget.png
+
+          # .desktop file — App Menu entry
           cat > deb_pkg/usr/share/applications/streamget.desktop << 'EOF'
           [Desktop Entry]
+          Version=2.0
           Name=StreamGet
-          Comment=Video Downloader
+          Comment=Video Downloader — YouTube, playlists and more
           Exec=/usr/local/bin/VideoDownloader
-          Icon=/usr/local/bin/logo.png
+          Icon=streamget
           Terminal=false
           Type=Application
-          Categories=Network;
+          Categories=Network;Video;
+          Keywords=youtube;download;video;playlist;
+          StartupWMClass=VideoDownloader
           EOF
 
+          # DEBIAN control
           cat > deb_pkg/DEBIAN/control << 'EOF'
           Package: streamget
           Version: 2.0
           Architecture: amd64
           Maintainer: Md. Imran Ali <imran.28279@gmail.com>
+          Depends: ffmpeg, python3-tk
           Description: StreamGet Video Downloader
+           Download videos and playlists from YouTube and other sites.
+           Supports quality selection, pause/resume, and playlist ranges.
           EOF
+
+          # postinst — install করার পর icon cache update করে
+          cat > deb_pkg/DEBIAN/postinst << 'EOF'
+          #!/bin/bash
+          set -e
+          if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+              gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
+          fi
+          if command -v update-desktop-database >/dev/null 2>&1; then
+              update-desktop-database /usr/share/applications || true
+          fi
+          EOF
+          chmod 755 deb_pkg/DEBIAN/postinst
+
+          # postrm — updates cache after uninstall
+          cat > deb_pkg/DEBIAN/postrm << 'EOF'
+          #!/bin/bash
+          set -e
+          if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+              gtk-update-icon-cache -f -t /usr/share/icons/hicolor || true
+          fi
+          if command -v update-desktop-database >/dev/null 2>&1; then
+              update-desktop-database /usr/share/applications || true
+          fi
+          EOF
+          chmod 755 deb_pkg/DEBIAN/postrm
 
           dpkg-deb --build deb_pkg StreamGet_Linux.deb
 
