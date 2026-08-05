@@ -25,20 +25,9 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
-      - name: Download ffmpeg
-        run: |
-          curl -L "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -o ffmpeg.zip
-          Expand-Archive -Path ffmpeg.zip -DestinationPath ffmpeg_extracted
-          Get-ChildItem -Recurse -Filter "ffmpeg.exe"  ffmpeg_extracted | Select-Object -First 1 | Copy-Item -Destination "."
-          Get-ChildItem -Recurse -Filter "ffprobe.exe" ffmpeg_extracted | Select-Object -First 1 | Copy-Item -Destination "."
-          Remove-Item -Recurse -Force ffmpeg_extracted
-          Remove-Item -Force ffmpeg.zip
-
       - name: Build EXE with PyInstaller
         run: |
           pyinstaller --onefile --windowed --name "VideoDownloader" `
-            --add-binary "ffmpeg.exe;." `
-            --add-binary "ffprobe.exe;." `
             --add-data "logo.ico;." `
             --add-data "logo.png;." `
             --icon "logo.ico" `
@@ -51,6 +40,7 @@ jobs:
         run: |
           @"
           !include "MUI2.nsh"
+          !include "LogicLib.nsh"
 
           Name "StreamGet"
           OutFile "StreamGet_Setup.exe"
@@ -90,6 +80,15 @@ jobs:
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\StreamGet" "Publisher" "Md. Imran Ali"
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\StreamGet" "DisplayVersion" "2.0"
 
+            ; FFmpeg check & auto-install
+            nsExec::ExecToStack 'cmd /c ffmpeg -version'
+            Pop $0
+            ${If} $0 != "0"
+              MessageBox MB_YESNO "FFmpeg found না। winget দিয়ে auto-install করবে?" IDYES inst_ffmpeg IDNO skip_ffmpeg
+              inst_ffmpeg:
+                nsExec::Exec 'winget install --id Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements'
+              skip_ffmpeg:
+            ${EndIf}
             WriteUninstaller "`$INSTDIR\Uninstall.exe"
           SectionEnd
 
