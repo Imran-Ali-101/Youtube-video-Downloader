@@ -26,9 +26,6 @@ def save_config(data):
         pass
 
 def get_ffmpeg_path():
-    if getattr(sys, 'frozen', False):
-        base = sys._MEIPASS
-        return os.path.join(base, "ffmpeg.exe")
     return "ffmpeg"
 
 def open_folder_in_manager(path):
@@ -155,17 +152,22 @@ class ProDownloader:
                     messagebox.showerror("Install Error", f"yt-dlp install failed:\n{e}")
 
             elif pkg == "ffmpeg":
-                # FFmpeg cannot be installed via pip.
-                messagebox.showinfo(
-                    "ffmpeg Required",
-                    "FFmpeg cannot be installed via pip.।\n\n"
-                    "Windows:\n"
-                    "  winget install ffmpeg\n"
-                    "  Or download it from https://ffmpeg.org/download.html\n\n"
-                    "Linux:\n"
-                    "  sudo apt install ffmpeg\n\n"
-                    "Restart the app after installation."
-                )
+                self.file_label.config(text="Installing ffmpeg...")
+                try:
+                    if platform.system() == "Windows":
+                        subprocess.run(
+                            ["winget", "install", "--id", "Gyan.FFmpeg", "-e",
+                             "--accept-source-agreements", "--accept-package-agreements"],
+                            timeout=300
+                        )
+                    else:
+                        subprocess.run(
+                            ["sudo", "apt", "install", "-y", "ffmpeg"],
+                            timeout=300
+                        )
+                    self.file_label.config(text="✓ ffmpeg installed")
+                except Exception as e:
+                    messagebox.showerror("Install Error", f"ffmpeg install failed:\n{e}")
 
         self.total_label.config(text="Ready to download", fg=TEXT_PRI)
         self.status_dot.config(fg=SUCCESS)
