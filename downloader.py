@@ -1,6 +1,5 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
-import yt_dlp
 import threading
 import os
 import re
@@ -62,13 +61,14 @@ MIN_W    = 550
 class ProDownloader:
     def __init__(self, root):
         self.root = root
-        self.root.title("StreamGet —Video Downloader")
+        self.root.title("StreamGet — Video Downloader")
         try:
             if getattr(sys, 'frozen', False):
                 base = sys._MEIPASS
             else:
                 base = os.path.dirname(os.path.abspath(__file__))
-            self.root.iconbitmap(os.path.join(base, "logo.ico"))
+            if platform.system() == "Windows":
+                self.root.iconbitmap(os.path.join(base, "logo.ico"))
             img = tk.PhotoImage(file=os.path.join(base, "logo.png"))
             self.root.iconphoto(True, img)
         except:
@@ -91,6 +91,88 @@ class ProDownloader:
         config = load_config()
         default_folder = config.get("last_folder", os.path.expanduser("~/Videos"))
         self._build_ui(default_folder)
+
+        # Dependency check after 0.5s
+        self.root.after(500, self._check_dependencies)
+
+    # ── Dependency Check ─────────────────────────────────────
+
+    def _check_dependencies(self):
+        missing = []
+
+        # yt-dlp check
+        try:
+            import yt_dlp
+        except ImportError:
+            missing.append("yt-dlp")
+
+        # ffmpeg check
+        ffmpeg = get_ffmpeg_path()
+        try:
+            result = subprocess.run(
+                [ffmpeg, "-version"],
+                capture_output=True,
+                timeout=5
+            )
+            if result.returncode != 0:
+                missing.append("ffmpeg")
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            missing.append("ffmpeg")
+
+        if missing:
+            pkg_list = ", ".join(missing)
+            msg = (
+                f"Could not find the following dependencies.:\n\n"
+                f"  {pkg_list}\n\n"
+                f"Install now?"
+            )
+            if messagebox.askyesno("Missing Dependencies", msg):
+                threading.Thread(
+                    target=self._install_dependencies,
+                    args=(missing,),
+                    daemon=True
+                ).start()
+        else:
+            # সব ঠিক আছে
+            self.total_label.config(text="Ready to download", fg=TEXT_PRI)
+            self.status_dot.config(fg=SUCCESS)
+
+    def _install_dependencies(self, packages):
+        self.total_label.config(text="Installing dependencies...", fg=WARNING)
+        self.status_dot.config(fg=WARNING)
+        self.download_btn.config(state='disabled')
+
+        for pkg in packages:
+            if pkg == "yt-dlp":
+                try:
+                    subprocess.run(
+                        [sys.executable, "-m", "pip", "install", "yt-dlp"],
+                        capture_output=True,
+                        timeout=120
+                    )
+                    self.file_label.config(text="✓ yt-dlp installed")
+                except Exception as e:
+                    messagebox.showerror("Install Error", f"yt-dlp install failed:\n{e}")
+
+            elif pkg == "ffmpeg":
+                # FFmpeg cannot be installed via pip.
+                messagebox.showinfo(
+                    "ffmpeg Required",
+                    "FFmpeg cannot be installed via pip.।\n\n"
+                    "Windows:\n"
+                    "  winget install ffmpeg\n"
+                    "  Or download it from https://ffmpeg.org/download.html\n\n"
+                    "Linux:\n"
+                    "  sudo apt install ffmpeg\n\n"
+                    "Restart the app after installation."
+                )
+
+        self.total_label.config(text="Ready to download", fg=TEXT_PRI)
+        self.status_dot.config(fg=SUCCESS)
+        self.download_btn.config(state='normal')
+        self.file_label.config(text="")
+
+    # ── UI Build ─────────────────────────────────────────────
 
     def _build_ui(self, default_folder):
         root = self.root
@@ -256,7 +338,7 @@ class ProDownloader:
         self.status_dot = tk.Label(status_card, text="●", font=('Arial', 10),
                                    fg=TEXT_SEC, bg=SURFACE)
         self.status_dot.pack(side=tk.LEFT, padx=(0, 8))
-        self.total_label = tk.Label(status_card, text="Ready to download",
+        self.total_label = tk.Label(status_card, text="Checking dependencies...",
                                     fg=TEXT_PRI, font=('Arial', 11, 'bold'), bg=SURFACE)
         self.total_label.pack(side=tk.LEFT)
         self.stats_label = tk.Label(status_card, text="",
@@ -378,14 +460,12 @@ class ProDownloader:
         return re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])').sub('', text)
 
     def hook(self, d):
-        # Block here when paused — resumes when pause_event is set again
         self._pause_event.wait()
 
         if d['status'] == 'downloading':
             total_b    = d.get('total_bytes') or d.get('total_bytes_estimate')
             downloaded = d.get('downloaded_bytes', 0)
 
-            # Calculate MB values for display
             if total_b:
                 p_val    = (downloaded / total_b) * 100
                 total_mb = total_b / 1024 / 1024
@@ -407,7 +487,7 @@ class ProDownloader:
                 self.total_label.config(text="Paused", fg=WARNING)
                 self.status_dot.config(fg=WARNING)
             else:
-                self.total_label.config(text=f"Downloading...  {current} / {total_v}", fg=TEXT_PRI)
+                self.total_label.config(text=f"Downloading... ", fg=TEXT_PRI)
                 self.status_dot.config(fg=ACCENT)
 
             self.file_label.config(text=f"↓  {fname}" if fname else "")
@@ -435,6 +515,18 @@ class ProDownloader:
         os._exit(0)
 
     def download_logic(self):
+        try:
+            import yt_dlp
+        except ImportError:
+            messagebox.showerror(
+                "yt-dlp not found",
+                "yt-dlp is not installed. Please restart the app or install it manually:\n\n"
+                "pip install yt-dlp"
+            )
+            self.download_btn.config(state='normal')
+            self.pause_btn.config(state='disabled')
+            return
+
         url = self.url_input.get().strip()
         if not url or url == "Paste YouTube / playlist URL here...":
             self.download_btn.config(state='normal')
