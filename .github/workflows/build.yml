@@ -80,15 +80,8 @@ jobs:
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\StreamGet" "Publisher" "Md. Imran Ali"
             WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\StreamGet" "DisplayVersion" "2.0"
 
-            ; FFmpeg check & auto-install
-            nsExec::ExecToStack 'cmd /c ffmpeg -version'
-            Pop $R0
-            $${If} $R0 != "0"
-              MessageBox MB_YESNO "FFmpeg not found. Install automatically via winget?" IDYES inst_ffmpeg IDNO skip_ffmpeg
-              inst_ffmpeg:
-                nsExec::Exec 'winget install --id Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements'
-              skip_ffmpeg:
-            $${EndIf}
+            ; FFmpeg auto-install via winget
+            nsExec::Exec 'winget install --id Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements'
             WriteUninstaller "`$INSTDIR\Uninstall.exe"
           SectionEnd
 
