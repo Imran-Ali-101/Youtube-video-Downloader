@@ -82,13 +82,13 @@ jobs:
 
             ; FFmpeg check & auto-install
             nsExec::ExecToStack 'cmd /c ffmpeg -version'
-            Pop $0
-            ${If} $0 != "0"
-              MessageBox MB_YESNO "FFmpeg found না। winget দিয়ে auto-install করবে?" IDYES inst_ffmpeg IDNO skip_ffmpeg
+            Pop $R0
+            $${If} $R0 != "0"
+              MessageBox MB_YESNO "FFmpeg not found. Install automatically via winget?" IDYES inst_ffmpeg IDNO skip_ffmpeg
               inst_ffmpeg:
                 nsExec::Exec 'winget install --id Gyan.FFmpeg -e --accept-source-agreements --accept-package-agreements'
               skip_ffmpeg:
-            ${EndIf}
+            $${EndIf}
             WriteUninstaller "`$INSTDIR\Uninstall.exe"
           SectionEnd
 
