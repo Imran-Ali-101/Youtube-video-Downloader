@@ -111,7 +111,8 @@ jobs:
           "@ | Out-File -Encoding ASCII installer.nsi
 
       - name: Build NSIS installer
-        run: makensis installer.nsi
+        run: |
+          & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
 
       - name: Upload portable EXE as artifact
         uses: actions/upload-artifact@v4
